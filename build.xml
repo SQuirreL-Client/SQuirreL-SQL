@@ -1,0 +1,287 @@
+<project name="SQuirreLSQL" default="buildAll" basedir=".">
+
+
+    <property name="targetVM" value="17"/>
+
+    <target name="cleanAllAndInit" description="cleanAllAndInit">
+
+        <tstamp/> <!-- Needed to initialize DSTAMP and TSTAMP variables-->
+
+        <!-- DEFINE VERSION HERE ONLY-->
+        <!--<property name="squirrelsql.version" value="5.1.0"/>-->
+        <property name="squirrelsql.version" value="snapshot-${DSTAMP}_${TSTAMP}"/>
+
+        <delete dir="output"/>
+        <mkdir dir="output/work/bin"/>
+        <mkdir dir="output/dist"/>
+        <mkdir dir="output/dist/lib"/>
+        <mkdir dir="output/dist/plugins"/>
+        <mkdir dir="output/izPackInstallJars"/>
+        <mkdir dir="output/plainZip/work"/>
+
+        <delete dir="versionChecker/output"/>
+        <mkdir dir="versionChecker/output/work/bin"/>
+    </target>
+
+
+    <path id="build.classpath">
+        <fileset dir="core/lib">
+            <include name="**/*" />
+        </fileset>
+    </path>
+
+    <target name="buildAll" description="buildAll" depends="buildExInstaller">
+        <antcall target="createIZPackInstallJars"/>
+    </target>
+
+    <target name="buildExInstaller" description="buildExInstaller" depends="cleanAllAndInit">
+        <antcall target="compileVersionCheck"/>
+
+        <antcall target="compileCore"/>
+        <antcall target="createPlainZip"><param name="plainZipNamePostfix" value="base"/></antcall>
+        <antcall target="compileStandardPlugins"/>
+        <antcall target="createPlainZip"><param name="plainZipNamePostfix" value="standard"/></antcall>
+        <antcall target="compileOptionalPlugins"/>
+        <antcall target="createPlainZip"><param name="plainZipNamePostfix" value="optional"/></antcall>
+        <antcall target="compileMacPlugin"/>
+    </target>
+
+    <target name="createPlainZip" description="createPlainZip">
+        <delete dir="output/plainZip/work"/>
+
+        <property name="plainZipName" value="squirrelsql-${squirrelsql.version}-${plainZipNamePostfix}"/>
+
+        <mkdir dir="output/plainZip/work/${plainZipName}"/>
+
+        <copy todir="output/plainZip/work/${plainZipName}">
+            <fileset dir="output/dist">
+                <include name="**/*" />
+            </fileset>
+        </copy>
+
+        <copy todir="output/plainZip/work/${plainZipName}" overwrite="true">
+            <fileset dir="plainZipScripts">
+                <include name="**/*" />
+            </fileset>
+        </copy>
+
+        <zip destfile="output/plainZip/${plainZipName}.zip" basedir="output/plainZip/work"/>
+    </target>
+
+
+    <property name="izpack-dist" value="${basedir}/installer/izpack5"/>
+    <property name="izpack-installer" value="izpack-5.2.4-with-dependencies.jar"/>
+    <path id="lib.path">
+        <fileset dir="${izpack-dist}" includes="izpack-5.2.4-with-dependencies.jar"/>
+    </path>
+
+    <taskdef name="izpack"
+             classname="com.izforge.izpack.ant.IzPackTask"
+             classpathref="lib.path"/>
+
+    <target name="createIZPackInstallJars" description="createIZPackInstallJars">
+
+        <izpack input="installer/other/izpack-other.xml"
+                output="output/izPackInstallJars/squirrel-sql-${squirrelsql.version}-standard.jar"
+                installerType="standard"
+                basedir="${basedir}"
+                izPackDir="${izpack-dist}"
+                inheritAll="true">
+        </izpack>
+
+        <izpack input="installer/mac/izpack-mac.xml"
+                output="output/izPackInstallJars/squirrel-sql-${squirrelsql.version}-MACOSX-install.jar"
+                installerType="standard"
+                basedir="${basedir}"
+                izPackDir="${izpack-dist}"
+                inheritAll="true">
+        </izpack>
+
+    </target>
+
+    <pathconvert property="manifest.classpath" pathsep=" ">
+        <path refid="build.classpath"/>
+        <mapper>
+            <chainedmapper>
+                <flattenmapper/>
+                <globmapper from="*.jar" to="lib/*.jar"/>
+            </chainedmapper>
+        </mapper>
+    </pathconvert>
+
+    <target name="compileVersionCheck" description="compileVersionCheck">
+        <javac source="1.7" target="1.7"
+               includeantruntime="false"
+               srcdir="versionChecker/src"
+               destdir="versionChecker/output/work/bin"
+               debug="true">
+        </javac>
+
+        <jar jarfile="versionChecker/output/versioncheck.jar" basedir="versionChecker/output/work/bin">
+        </jar>
+
+    </target>
+
+
+
+    <target name="compileCore" description="compileCore">
+        <javac source="${targetVM}" target="${targetVM}"
+            includeantruntime="false"
+            srcdir="core/src"
+            destdir="output/work/bin"
+            classpathref="build.classpath"
+            debug="true">
+            <compilerarg value="-Xlint:deprecation"/>
+<!--            <compilerarg value="-Xlint:unchecked"/> -->
+        </javac>
+        <copy todir="output/work/bin">
+            <fileset dir="core/src">
+                <exclude name="**/*.java" />
+            </fileset>
+        </copy>
+        <!--
+            Add splash screen image to the JAR so that Java can pick
+            it up without the command line argument
+        -->
+        <copy todir="output/work/bin/icons">
+            <fileset dir="launcher/icons">
+                <include name="**/splash.jpg" />
+            </fileset>
+        </copy>
+        <replace file="output/work/bin/net/sourceforge/squirrel_sql/client/Version.properties" token="squirrelsql.version.value" value="${squirrelsql.version}"/>
+        <jar jarfile="output/dist/squirrel-sql.jar" basedir="output/work/bin">
+            <manifest>
+              <attribute name="Built-By" value="${user.name}"/>
+              <attribute name="Main-Class" value="net.sourceforge.squirrel_sql.client.Main"/>
+              <attribute name="Class-Path" value="${manifest.classpath}"/>
+              <attribute name="SplashScreen-Image" value="icons/splash.jpg"/>
+            </manifest>
+        </jar>
+        <copy todir="output/dist/lib">
+            <fileset dir="core/lib">
+                <include name="**/*" />
+            </fileset>
+        </copy>
+        <copy todir="output/dist/lib">
+            <file file="versionChecker/output/versioncheck.jar"/>
+        </copy>
+        <copy todir="output/dist/">
+            <fileset dir="launcher">
+                <include name="**/*" />
+            </fileset>
+        </copy>
+        <copy todir="output/dist/doc/">
+            <fileset dir="core/doc">
+                <include name="**/*" />
+            </fileset>
+        </copy>
+    </target>
+
+
+    <target name="compileStandardPlugins" description="compileStandardPlugins">
+        <antcall target="doCompilePlugin"><param name="pluginName" value="codecompletion"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="dbcopy"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="graph"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="laf"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="refactoring"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sqlbookmark"/></antcall>
+    </target>
+
+
+    <target name="compileOptionalPlugins" description="compileOptionalPlugins">
+        <antcall target="doCompilePlugin"><param name="pluginName" value="codecompletion"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="dbcopy"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="graph"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="laf"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="refactoring"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sqlbookmark"/></antcall>
+
+        <antcall target="doCompilePlugin"><param name="pluginName" value="db2"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="derby"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="example"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="exportconfig"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="favs"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="firebird"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="greenplum"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="h2"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="hibernate"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="i18n"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="informix"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="mssql"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="multisource"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="mysql"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="netezza"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="oracle"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="postgres"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sessionscript"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="smarttools"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sqlparam"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sqlreplace"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sqlval"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="swingViolations"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="sybase"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="vertica"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="wikiTableConfigurations"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="highresicon"/></antcall>
+        <antcall target="doCompilePlugin"><param name="pluginName" value="cache"/></antcall>
+    </target>
+
+    <target name="compileMacPlugin" description="compileMacPlugin">
+        <antcall target="doCompilePlugin"><param name="pluginName" value="macosx"/></antcall>
+    </target>
+
+
+
+
+
+    <target name="doCompilePlugin" description="doCompilePlugin">
+        <delete dir="output/work/${pluginName}/bin"/>
+        <mkdir dir="output/work/${pluginName}/bin"/>
+
+        <echo message="###Compiling Plugin ${pluginName}"/>
+
+        <javac source="${targetVM}" target="${targetVM}"
+            includeantruntime="false"
+            srcdir="plugins/${pluginName}/src"
+            destdir="output/work/${pluginName}/bin"
+            debug="true" >
+            <classpath refid="build.classpath"/>
+            <classpath>
+                <path id="plugin.classpath.core">
+                    <fileset file="output/dist/squirrel-sql.jar"/>
+                </path>
+            </classpath>
+            <classpath>
+                <path id="plugin.classpath">
+                    <fileset dir="plugins/${pluginName}">
+                        <exclude name="src/**/*" /> <!-- Not only lib because of the laf Plugin which needs jars and zips from the directories skinlf-theme-packs/ and lafs/. -->
+                    </fileset>
+                </path>
+            </classpath>
+            <compilerarg value="-Xlint:deprecation"/>
+<!--            <compilerarg value="-Xlint:unchecked"/> -->
+        </javac>
+        <copy todir="output/work/${pluginName}/bin">
+            <fileset dir="plugins/${pluginName}/src">
+                <exclude name="**/*.java" />
+            </fileset>
+        </copy>
+        <jar jarfile="output/dist/plugins/${pluginName}.jar" basedir="output/work/${pluginName}/bin"/>
+
+        <copy todir="output/dist/plugins/${pluginName}">
+            <fileset dir="plugins/${pluginName}">
+                <exclude name="src/**/*" />
+            </fileset>
+        </copy>
+        <delete dir="output/dist/plugins/${pluginName}/src"/>
+
+
+    </target>
+
+    <target name="runApp" description="Run SquirrelSQL">
+        <java jar="output/dist/squirrel-sql.jar" fork="true">
+            <jvmarg value="-splash:output/dist/icons/splash.jpg" />
+        </java>
+    </target>
+
+</project> 
